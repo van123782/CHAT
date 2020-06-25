@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CHAT</title>
+    
+    <script type="module" src="cmp/mi-footer.js"></script>
+    <link rel="stylesheet" href="css/estilos.css">
+    
+   
+    <!-- update the version number as needed -->
+    <script  src="/__/firebase/7.15.4/firebase-app.js"></script>
+    <!-- include only the Firebase features as you need -->
+    <script  src="/__/firebase/7.15.4/firebase-auth.js"></script>
+    <script  src="/__/firebase/7.15.4/firebase-firestore.js"></script>
+  <!-- initialize the SDK after all desired features are loaded -->
+    <script  src="/__/firebase/init.js"></script>
+
+  </head>
+  <body>
+    <header>
+      <button id=terminarSesión type="button" onclick="terminaSesión();">
+        Terminar Sesión
+      </button>
+      <h1>Chat</h1>
+    </header>
+    <figure><img id=avatar src="" alt=Avatar></figure>
+    <p><b><output id=email></output></b><br><output id=nombre></output></p>
+    <form action="javascript:agrega();">
+      <input id="texto" type="text" required placeholder="Mensaje">
+      <button>Enviar</button>
+    </form>
+    <ul id="mensajes">
+      <li><progress max="100">Cargando…</progress></li>
+    </ul>
+    <mi-footer></mi-footer>
+    <script>
+     
+      let usuario = "";
+     
+      const auth = firebase.auth();
+   
+      let desconecta = null;
+    
+      const provider = new firebase.auth.GoogleAuthProvider();
+    
+      provider.setCustomParameters({ prompt: "select_account" });
+     
+      auth.onAuthStateChanged(
+       
+        usuarioAuth => {
+          if (usuarioAuth && usuarioAuth.email) {
+            
+            usuario = usuarioAuth.email;
+            email.value = usuarioAuth.email;
+            nombre.value = usuarioAuth.displayName || "";
+            avatar.src = usuarioAuth.photoURL || "";
+            
+            muestraMensajes();
+          } else {
+            
+            auth.signInWithRedirect(provider);
+            //auth.signInWithPopup(provider);
+            //auth.signInAnonymously();
+          }
+        },
+        
+        procesaError
+      );
+     
+      const firestore = firebase.firestore();
+    
+      function agrega() {
+      
+        firestore.collection("MENSAJE").add({
+          USUARIO: usuario,
+          TEXTO: texto.value.trim(),
+          TIMESTAMP: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      
+      function muestraMensajes() {
+      
+        desconecta = firestore.collection("MENSAJE")
+          .orderBy("TIMESTAMP", "desc")
+          .onSnapshot(
+            /** Función que muestra los datos enviados por el servidor. Si los
+             * datos cambian en el servidor, se vuelve a invocar esta función y
+             * recibe los datos actualizados.
+             * @param {Object} documentos estructura parecida a un Array, que
+             * contiene una copia de los datos en el servidor. */
+             documentos => {
+              let inner = "";
+              if (documentos.size > 0) {
+                
+                 documentos.forEach(doc => {
+                 
+                  const data = doc.data();
+                 
+                  inner += /* html */
+                    `<li>
+                      <b>${cod(data.USUARIO)}</b><br>${cod(data.TEXTO)}
+                    </li>`;
+                });
+                mensajes.innerHTML = inner;
+              } else {
+                
+                mensajes.innerHTML = /* html */ `<li>No hay mensajes.</li>`;
+              }
+            },
+           
+            e => {
+              procesaError(e);
+              desconecta = null;
+             
+              muestraMensajes();
+            }
+          );
+      }
+      async function terminaSesión() {
+        try {
+          if (desconecta) {
+            desconecta();
+            desconecta = null;
+          }
+          await auth.signOut();
+        } catch (e) {
+          procesaError(e);
+        }
+      }
+      function procesaError(e) {
+        console.log(e);
+        alert(e.message);
+      }
+      function cod(valor) {
+        return (valor || "").toString()
+          .replace(/[<>"']/g,
+            /** @param {string} letra */
+            letra => {
+              switch (letra) {
+                case "<": return "&lt;";
+                case ">": return "&gt;";
+                case '"': return "&quot;";
+                case "'": return "&#039;";
+                default: return letra;
+              }
+            });
+      }
+    </script>
+  </body>
+</html>
